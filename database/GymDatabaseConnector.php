@@ -162,24 +162,34 @@ class GymDatabaseConnector {
         }
     }
 
-    // Fetch dashboard stats
     public function getDashboardStats() {
         try {
             $stats = [];
             $stmt = $this->conn->prepare("CALL GetDashboardStats()");
             $stmt->execute();
-            $stats['total_members'] = $stmt->fetch()['total_members'];
-            $stats['total_sales'] = $stmt->fetch()['total_sales'];
+    
+            $totals = $stmt->fetch(PDO::FETCH_ASSOC);
+            $stats['total_members'] = $totals['total_members'] ?? 0;
+            $stats['total_sales'] = $totals['total_sales'] ?? 0.00;
+    
             $stmt->nextRowset();
-            $stats['daily_sales'] = $stmt->fetchAll();
+            $stats['daily_sales'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
             $stmt->nextRowset();
-            $stats['weekly_sales'] = $stmt->fetchAll();
+            $stats['weekly_sales'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
             $stmt->nextRowset();
-            $stats['yearly_sales'] = $stmt->fetchAll();
+            $stats['monthly_sales'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
             $stmt->nextRowset();
-            $stats['recent_logs'] = $stmt->fetchAll();
+            $stats['yearly_sales'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+            $stmt->nextRowset();
+            $stats['recent_logs'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
             return $stats;
         } catch (PDOException $e) {
+            error_log("PDOException in getDashboardStats: " . $e->getMessage() . " at " . $e->getTraceAsString());
             throw new Exception("Error fetching dashboard stats: " . $e->getMessage());
         }
     }

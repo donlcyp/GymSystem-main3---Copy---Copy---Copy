@@ -10,8 +10,9 @@ if (!isset($_SESSION['username'])) {
 }
 
 // Initialize variables
-$total_sales = 0.00;
 $total_members = 0;
+$active_members = 0;
+$total_revenue = 0.00; // Default value to prevent undefined variable
 $error = '';
 $success = '';
 
@@ -20,14 +21,14 @@ try {
     $stats = $db->getDashboardStats();
     
     $total_members = $stats['total_members'] ?? 0;
-    $active_members = $stats['total_members'] ?? 0; // Consider differentiating active vs total if needed
-    $total_revenue = $stats['total_sales'] ?? 0.00; // Ensure this matches the key from getDashboardStats
+    $active_members = $stats['total_members'] ?? 0; // Adjust if active differs
+    $total_revenue = $stats['total_sales'] ?? 0.00; // Matches getDashboardStats key
     $recent_logs = $stats['recent_logs'] ?? [];
 } catch (Exception $e) {
     $error = "Error fetching dashboard data: " . $e->getMessage();
 }
 
-// Member addition (only process if POST request)
+// Member addition (POST request handling)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $firstName = filter_input(INPUT_POST, 'first_name', FILTER_SANITIZE_STRING) ?? '';
     $lastName = filter_input(INPUT_POST, 'last_name', FILTER_SANITIZE_STRING) ?? '';
@@ -87,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&display=swap">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* [Your existing CSS remains unchanged] */
         html, body {
             margin: 0;
             padding: 0;
@@ -480,7 +482,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 min-width: 100%; /* Full width on mobile */
             }
         }
-        </style>
+    </style>
 </head>
 <body>
     <header class="admin-header">
@@ -504,6 +506,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="dashboard-layout">
         <div class="content-wrapper">
             <nav class="sidebar-nav" id="sidebar">
+                <!-- [Sidebar HTML unchanged] -->
                 <div class="sidebar-header">
                     <h2 class="gym-title">He-Man Fitness Gym</h2>
                     <img src="https://cdn.builder.io/api/v1/image/assets/d47b9c64343c4fb28708dd8b67fd1cce/487c8045bbe2fa69683c59be11df183c65f6fc7aac898ce424235e21c4b67556?placeholderIfAbsent=true" alt="Dashboard Logo" class="sidebar-logo"/>
@@ -575,11 +578,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <h2>Get Fit</h2>
                 <p>This is where your dashboard content will go, aligned with the sidebar.</p>
                 
+                <?php if ($error): ?>
+                    <p style="color: red;"><?php echo htmlspecialchars($error); ?></p>
+                <?php endif; ?>
+                <?php if ($success): ?>
+                    <p style="color: green;"><?php echo htmlspecialchars($success); ?></p>
+                <?php endif; ?>
+
                 <div class="dashboard-cards">
                     <div class="card">
                         <i class="fas fa-dollar-sign card-icon"></i>
                         <div class="card-content">
-                            <h3>Total Revenue</h3>
+                            <h3>Total Sales Revenue</h3>
                             <p>$<?php echo number_format($total_revenue, 2); ?></p>
                         </div>
                     </div>
@@ -601,7 +611,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <?php if ($user_role === 'admin'): ?>
                 <div class="graph-container">
-                    <h3>Sales Overview (Admin)</h3>
+                    <h3>Sales Revenue Overview (Admin)</h3>
                     <canvas id="adminSalesChart"></canvas>
                 </div>
                 <?php endif; ?>
@@ -616,6 +626,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <footer class="main-footer">
+            <!-- [Footer HTML unchanged] -->
             <div class="footer-content">
                 <div class="footer-section">
                     <h3 class="footer-title">Contacts</h3>
@@ -697,46 +708,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 const dailyData = <?php echo json_encode(array_column($stats['daily_sales'], 'total')); ?>;
                 const weeklyLabels = <?php echo json_encode(array_column($stats['weekly_sales'], 'week')); ?>;
                 const weeklyData = <?php echo json_encode(array_column($stats['weekly_sales'], 'total')); ?>;
+                const monthlyLabels = <?php echo json_encode(array_column($stats['monthly_sales'], 'month')); ?>;
+                const monthlyData = <?php echo json_encode(array_column($stats['monthly_sales'], 'total')); ?>;
                 const yearlyLabels = <?php echo json_encode(array_column($stats['yearly_sales'], 'year')); ?>;
                 const yearlyData = <?php echo json_encode(array_column($stats['yearly_sales'], 'total')); ?>;
+
+                // Combine all labels for a unified x-axis
+                const allLabels = [...new Set([...dailyLabels, ...weeklyLabels, ...monthlyLabels, ...yearlyLabels])].sort();
 
                 new Chart(ctx, {
                     type: 'line',
                     data: {
-                        datasets: [{
-                            label: 'Daily Sales',
-                            data: dailyData,
-                            borderColor: 'rgba(226, 29, 29, 1)',
-                            tension: 0.1
-                        }, {
-                            label: 'Weekly Sales',
-                            data: weeklyData,
-                            borderColor: '#4CAF50',
-                            tension: 0.1
-                        }, {
-                            label: 'Monthly Sales',
-                            data: monthlyData,
-                            borderColor: '#FF9800', // Orange for monthly
-                            backgroundColor: 'rgba(255, 152, 0, 0.2)',
-                            fill: false,
-                            tension: 0.1
-                        }, {
-                            label: 'Yearly Sales',
-                            data: yearlyData,
-                            borderColor: '#2196F3',
-                            tension: 0.1
-                        }]
+                        labels: allLabels,
+                        datasets: [
+                            {
+                                label: 'Daily Sales',
+                                data: dailyData,
+                                borderColor: 'rgba(226, 29, 29, 1)',
+                                backgroundColor: 'rgba(226, 29, 29, 0.2)',
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: 'Weekly Sales',
+                                data: weeklyData,
+                                borderColor: '#4CAF50',
+                                backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: 'Monthly Sales',
+                                data: monthlyData,
+                                borderColor: '#FF9800', // Orange for monthly
+                                backgroundColor: 'rgba(255, 152, 0, 0.2)',
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: 'Yearly Sales',
+                                data: yearlyData,
+                                borderColor: '#2196F3',
+                                backgroundColor: 'rgba(33, 150, 243, 0.2)',
+                                fill: false,
+                                tension: 0.1
+                            }
+                        ]
                     },
                     options: {
                         scales: {
                             x: {
                                 type: 'category',
-                                labels: dailyLabels.concat(weeklyLabels, yearlyLabels),
                                 title: { display: true, text: 'Time Period', color: '#fff' },
                                 ticks: { color: '#fff' }
                             },
                             y: {
-                                title: { display: true, text: 'Amount ($)', color: '#fff' },
+                                title: { display: true, text: 'Sales Revenue ($)', color: '#fff' },
                                 ticks: { color: '#fff' }
                             }
                         },
