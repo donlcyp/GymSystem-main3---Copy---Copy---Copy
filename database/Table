@@ -1,0 +1,76 @@
+CREATE DATABASE IF NOT EXISTS my_database;
+USE my_database;
+
+-- Users Table
+CREATE TABLE Users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role ENUM('admin', 'member') NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Members Table
+CREATE TABLE Members (
+    member_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    phone VARCHAR(20),
+    join_date DATE DEFAULT CURRENT_DATE
+);
+
+-- Attendance Table
+CREATE TABLE Attendance (
+    attendance_id INT AUTO_INCREMENT PRIMARY KEY,
+    member_id INT,
+    check_in TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    check_out TIMESTAMP NULL,
+    FOREIGN KEY (member_id) REFERENCES Members(member_id) ON DELETE CASCADE
+);
+
+-- Logs Table
+CREATE TABLE Logs (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    action VARCHAR(255),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE SET NULL
+);
+
+-- Stored Procedure: User Login
+DELIMITER $$
+CREATE PROCEDURE UserLogin(IN p_username VARCHAR(50), IN p_password VARCHAR(255))
+BEGIN
+    DECLARE user_count INT;
+    SELECT COUNT(*) INTO user_count FROM Users WHERE username = p_username AND password_hash = p_password;
+    IF user_count > 0 THEN
+        SELECT 'Login successful' AS message;
+    ELSE
+        SELECT 'Invalid credentials' AS message;
+    END IF;
+END $$
+DELIMITER ;
+
+-- Stored Procedure: Add Log Entry
+DELIMITER $$
+CREATE PROCEDURE AddLog(IN p_user_id INT, IN p_action VARCHAR(255))
+BEGIN
+    INSERT INTO Logs (user_id, action) VALUES (p_user_id, p_action);
+END $$
+DELIMITER ;
+
+-- Stored Procedure: Add Member
+DELIMITER $$
+CREATE PROCEDURE AddMember(IN p_name VARCHAR(100), IN p_email VARCHAR(100), IN p_phone VARCHAR(20))
+BEGIN
+    INSERT INTO Members (name, email, phone) VALUES (p_name, p_email, p_phone);
+END $$
+DELIMITER ;
+
+-- Stored Procedure: Record Attendance
+DELIMITER $$
+CREATE PROCEDURE RecordAttendance(IN p_member_id INT)
+BEGIN
+    INSERT INTO Attendance (member_id) VALUES (p_member_id);
+END $$
+DELIMITER ;
