@@ -2,19 +2,17 @@
 session_start();
 require_once '../database/GymDatabaseConnector.php';
 
-// Check if user is logged in
 if (!isset($_SESSION['username'])) {
     header("Location: login.php");
     exit();
 }
 
-$user_role = $_SESSION['role'] ?? null; // Define user role from session
+$user_role = $_SESSION['role'] ?? null;
 if (!$user_role) {
     header("Location: login.php");
     exit();
 }
 
-// Initialize variables
 $error = '';
 $success = '';
 $defaultDateAdded = date('Y-m-d');
@@ -22,7 +20,6 @@ $prices = [];
 
 try {
     $db = GymDatabaseConnector::getInstance();
-    // Fetch prices with fallback
     $prices['Per Session'] = floatval($db->getPrice('per_session')) ?: 0.00;
     $prices['Monthly'] = floatval($db->getPrice('monthly')) ?: 0.00;
 
@@ -34,10 +31,10 @@ try {
         $address = filter_input(INPUT_POST, 'address', FILTER_SANITIZE_STRING);
         $birthDate = filter_input(INPUT_POST, 'birthDate', FILTER_SANITIZE_STRING);
         $plan = filter_input(INPUT_POST, 'plan', FILTER_SANITIZE_STRING);
-        $dateAdded = filter_input(INPUT_POST, 'dateAdded', FILTER_SANITIZE_STRING) ?: $defaultDateAdded;
-    
+        $startDate = filter_input(INPUT_POST, 'dateAdded', FILTER_SANITIZE_STRING) ?: $defaultDateAdded;
+
         if (empty($firstName) || empty($lastName) || empty($email) || empty($phoneNumber) || 
-            empty($address) || empty($birthDate) || empty($plan) || empty($dateAdded)) {
+            empty($address) || empty($birthDate) || empty($plan) || empty($startDate)) {
             $error = "All fields are required";
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = "Invalid email format";
@@ -50,6 +47,15 @@ try {
             if ($amount == 0.00) {
                 $error = "Price not found for plan: $plan.";
             } else {
+                $startDateTime = new DateTime($startDate);
+                $endDateTime = clone $startDateTime;
+                if ($plan === 'Per Session') {
+                    $endDateTime->modify('+1 day');
+                } elseif ($plan === 'Monthly') {
+                    $endDateTime->modify('+30 days');
+                }
+                $endDate = $endDateTime->format('Y-m-d H:i:s');
+
                 $memberData = [
                     'first_name' => $firstName,
                     'last_name' => $lastName,
@@ -58,21 +64,22 @@ try {
                     'address' => $address,
                     'birth_date' => $birthDate,
                     'plan' => $pricingType,
-                    'start_date' => $dateAdded,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
                     'amount' => $amount,
-                    'status' => 'active',  // Changed from 1 to 'active'
+                    'status' => 'active',
                     'created_by' => $_SESSION['username']
                 ];
-    
+
                 $result = $db->addMember($memberData);
-                if (strpos($result, 'success') !== false) {
+                if ($result === true || strpos($result, 'success') !== false) {
                     $userid = $_SESSION['username'];
-                    $action = "Added member: $firstName $lastName with plan $plan for $amount";
+                    $action = "Added member: $firstName $lastName with plan $plan for $amount, ending on $endDate";
                     $db->addLog($userid, $action);
                     header("Location: ListMember.php?success=1");
                     exit();
                 } else {
-                    $error = "Error adding member: $result";
+                    $error = "Error adding member: " . var_export($result, true);
                 }
             }
         }
@@ -88,14 +95,11 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Membership - He-Man Fitness Gym</title>
-    <!-- Font Awesome CDN -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <!-- Google Fonts for Anton and Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter&display=swap" rel="stylesheet">
-    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
     <style>
-        /* Your existing CSS remains unchanged */
+        /* CSS remains unchanged */
         html, body {
             margin: 0;
             padding: 0;
@@ -105,7 +109,6 @@ try {
             color: #e0e0e0;
             font-family: 'Inter', sans-serif;
         }
-
         .admin-header {
             background-color: rgba(68, 68, 68, 1);
             padding: 15px 40px;
@@ -120,14 +123,12 @@ try {
             left: 0;
             z-index: 20;
         }
-
         .menu-icon {
             font-size: 20px;
             color: #fff;
             margin-right: 15px;
             cursor: pointer;
         }
-
         .admin-title {
             font-family: 'Anton', sans-serif;
             font-size: 24px;
@@ -135,7 +136,6 @@ try {
             font-weight: 400;
             margin: 0;
         }
-
         .dashboard-layout {
             background-color: rgba(49, 49, 49, 0.88);
             min-height: 100%;
@@ -143,13 +143,11 @@ try {
             flex-direction: column;
             padding-top: 50px;
         }
-
         .content-wrapper {
             display: flex;
             flex: 1;
             overflow: hidden;
         }
-
         .sidebar-nav {
             background-color: rgba(44, 44, 44, 1);
             width: 250px;
@@ -165,11 +163,9 @@ try {
             left: -250px;
             transition: left 0.3s ease;
         }
-
         .sidebar-nav.active {
             left: 0;
         }
-
         .sidebar-header {
             display: flex;
             align-items: center;
@@ -177,19 +173,16 @@ try {
             width: 100%;
             padding: 10px 0;
         }
-
         .sidebar-logo {
             width: 30px;
             margin-left: 10px;
             display: inline-block;
         }
-
         .sidebar-content {
             padding: 20px;
             width: 100%;
             box-sizing: border-box;
         }
-
         .gym-title {
             color: #fff;
             font-size: 24px;
@@ -199,7 +192,6 @@ try {
             text-align: center;
             display: inline-block;
         }
-
         .nav-menu {
             margin-top: 40px;
             display: flex;
@@ -209,7 +201,6 @@ try {
             padding: 0 10px;
             box-sizing: border-box;
         }
-
         .nav-item {
             border-radius: 20px;
             background-color: rgba(226, 29, 29, 1);
@@ -227,17 +218,14 @@ try {
             text-align: left;
             cursor: pointer;
         }
-
         .nav-item--active {
             background-color: rgba(255, 50, 50, 1);
         }
-
         .nav-icon {
             width: 18px;
             height: 18px;
             flex-shrink: 0;
         }
-
         .main-content {
             flex: 1;
             padding: 20px;
@@ -245,11 +233,9 @@ try {
             margin-left: 0;
             transition: margin-left 0.3s ease;
         }
-
         .main-content.shifted {
             margin-left: 250px;
         }
-
         .form-container {
             max-width: 900px;
             margin: 0 auto;
@@ -258,33 +244,28 @@ try {
             border-radius: 5px;
             box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.25);
         }
-
         h2 {
             color: #ffffff;
             font-family: 'Anton', sans-serif;
             margin-bottom: 20px;
             text-align: center;
         }
-
         .form-row {
             display: flex;
             justify-content: space-between;
             margin-bottom: 15px;
             gap: 20px;
         }
-
         .form-group {
             flex: 1;
             margin-bottom: 15px;
         }
-
         label {
             display: block;
             margin-bottom: 5px;
             color: #ffffff;
             font-family: 'Inter', sans-serif;
         }
-
         input, select {
             width: 100%;
             padding: 8px;
@@ -295,12 +276,10 @@ try {
             box-sizing: border-box;
             font-family: 'Inter', sans-serif;
         }
-
         input:focus, select:focus {
             border-color: #ff4444;
             outline: none;
         }
-
         button {
             background-color: #ff4444;
             color: white;
@@ -314,78 +293,45 @@ try {
             font-weight: 700;
             transition: background-color 0.3s;
         }
-
         button:hover {
             background-color: #cc0000;
         }
-
         .success-message {
             color: #ff4444;
             text-align: center;
             margin-top: 15px;
         }
-
-        /* Modal Styling */
         .modal-content {
-            background-color: #ffffff;
-            color: #000;
-            border: 1px solid #ccc;
+            background-color: #2c2c2c;
+            color: #e0e0e0;
             border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
-
-        .modal-header {
-            border-bottom: 1px solid #ccc;
-            padding: 15px;
+        .modal-header, .modal-footer {
+            border-color: #444;
         }
-
         .modal-title {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Anton', sans-serif;
             font-size: 18px;
-            font-weight: bold;
         }
-
         .modal-body {
             padding: 20px;
             font-family: 'Inter', sans-serif;
             font-size: 14px;
         }
-
-        .modal-footer {
-            border-top: 1px solid #ccc;
-            padding: 15px;
-            justify-content: center;
-        }
-
-        .modal-footer .btn {
-            padding: 8px 20px;
-            font-size: 14px;
-            font-family: 'Inter', sans-serif;
-            font-weight: 700;
-            border-radius: 20px;
-        }
-
         .modal-footer .btn-primary {
             background-color: #ff4444;
             border: none;
-            color: #fff;
         }
-
         .modal-footer .btn-secondary {
-            background-color: #ff4444;
+            background-color: #666;
             border: none;
-            color: #fff;
-            margin-left: 10px;
         }
-
         .modal-footer .btn-primary:hover {
             background-color: #cc0000;
         }
-
         .modal-footer .btn-secondary:hover {
-            background-color: #cc0000;
+            background-color: #555;
         }
-
         .error-message {
             color: #ff4444;
             text-align: center;
@@ -394,7 +340,6 @@ try {
             background-color: rgba(255, 68, 68, 0.1);
             border-radius: 4px;
         }
-
         @media (max-width: 991px) {
             .sidebar-nav {
                 width: 100%;
@@ -414,7 +359,7 @@ try {
                 gap: 15px;
             }
         }
-        </style>
+    </style>
 </head>
 <body>
     <header class="admin-header">
@@ -432,20 +377,20 @@ try {
                 <div class="sidebar-content">
                     <div class="nav-menu">
                         <?php if ($user_role === 'staff'): ?>
-                        <a href="dashboard.php" class="nav-item"><i class="fas fa-home nav-icon"></i><span>Home</span></a>
-                        <a href="ListMember.php" class="nav-item nav-item--active"><i class="fas fa-user-plus nav-icon"></i><span>Add Member</span></a>
-                        <a href="attendance.php" class="nav-item"><i class="fas fa-calendar-check nav-icon"></i><span>Attendance</span></a>
+                            <a href="dashboard.php" class="nav-item"><i class="fas fa-home nav-icon"></i><span>Home</span></a>
+                            <a href="ListMember.php" class="nav-item nav-item--active"><i class="fas fa-user-plus nav-icon"></i><span>Add Member</span></a>
+                            <a href="attendance.php" class="nav-item"><i class="fas fa-calendar-check nav-icon"></i><span>Attendance</span></a>
+                            <a href="membership.php" class="nav-item"><i class="fas fa-id-card nav-icon"></i><span>Membership</span></a>
                         <?php endif; ?>
                         <?php if ($user_role === 'admin'): ?>
-                        <a href="dashboard.php" class="nav-item"><i class="fas fa-home nav-icon"></i><span>Home</span></a>
-                        <a href="ListMember.php" class="nav-item nav-item--active"><i class="fas fa-user-plus nav-icon"></i><span>Add Member</span></a>
-                        <a href="attendance.php" class="nav-item"><i class="fas fa-calendar-check nav-icon"></i><span>Attendance</span></a>
-                        <a href="membership.php" class="nav-item"><i class="fas fa-id-card nav-icon"></i><span>Membership</span></a>
-                        <a href="logs.php" class="nav-item"><i class="fas fa-file-alt nav-icon"></i><span>Logs</span></a>
-                        <a href="register.php" class="nav-item"><i class="fa-solid fa-circle-user"></i><span>Add Employee</span></a>
-                        <a href="employees.php" class="nav-item"><i class="fa-solid fa-user-tie"></i><span>Employees</span></a>
-                        <a href="pricing.php" class="nav-item"><i class="fas fa-dollar-sign nav-icon"></i><span>Pricing</span></a>
-                        <a href="logout.php" class="nav-item"><i class="fas fa-sign-out-alt nav-icon"></i><span>Logout</span></a>
+                            <a href="dashboard.php" class="nav-item"><i class="fas fa-home nav-icon"></i><span>Home</span></a>
+                            <a href="ListMember.php" class="nav-item nav-item--active"><i class="fas fa-user-plus nav-icon"></i><span>Add Member</span></a>
+                            <a href="attendance.php" class="nav-item"><i class="fas fa-calendar-check nav-icon"></i><span>Attendance</span></a>
+                            <a href="membership.php" class="nav-item"><i class="fas fa-id-card nav-icon"></i><span>Membership</span></a>
+                            <a href="logs.php" class="nav-item"><i class="fas fa-file-alt nav-icon"></i><span>Logs</span></a>
+                            <a href="register.php" class="nav-item"><i class="fa-solid fa-circle-user"></i><span>Employee Create Account</span></a>
+                            <a href="employees.php" class="nav-item"><i class="fa-solid fa-user-tie"></i><span>Employees</span></a>
+                            <a href="pricing.php" class="nav-item"><i class="fas fa-dollar-sign nav-icon"></i><span>Pricing</span></a>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -491,12 +436,12 @@ try {
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="dateAdded">Date Added:</label>
+                                <label for="dateAdded">Start Date:</label>
                                 <input type="date" id="dateAdded" name="dateAdded" value="<?php echo htmlspecialchars($defaultDateAdded); ?>" required>
                             </div>
                             <div class="form-group">
                                 <label for="plan">Plan:</label>
-                                <select id="plan" name="plan" required>
+                                <select id="plan" name="plan" required onchange="updateEndDatePreview()">
                                     <option value="" disabled selected>Select a plan</option>
                                     <option value="Per Session">Per Session (₱<?php echo number_format($prices['Per Session'], 2); ?>)</option>
                                     <option value="Monthly">Monthly (₱<?php echo number_format($prices['Monthly'], 2); ?>)</option>
@@ -545,11 +490,9 @@ try {
         <input type="hidden" name="plan" id="hiddenPlan">
     </form>
 
-    <!-- Bootstrap JS and Popper.js -->
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js" integrity="sha384-oBqDVmMz9ATKxIep9tiCxS/Z9fNfEXiDAYTujMAeBAsjFuCZSmKbSSUnQlmh/jp3" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js" integrity="sha384-fbbOQedDUMZZ5KreZpsbe1LCZPVmfTnH7ois6mU1QK+m14rQ1l2bGBq41eYeM/fS" crossorigin="anonymous"></script>
     <script>
-        // Pass PHP prices to JavaScript as numbers
         const prices = <?php echo json_encode($prices, JSON_NUMERIC_CHECK); ?>;
 
         document.getElementById('menuToggle').addEventListener('click', function() {
@@ -573,7 +516,8 @@ try {
                 plan: document.getElementById('plan').value
             };
 
-            // Validate plan and price
+            // Calculate end date for preview
+            let endDateText = 'N/A';
             let paymentAmount = 'N/A';
             if (formData.plan && prices[formData.plan] !== undefined) {
                 const price = Number(prices[formData.plan]);
@@ -583,6 +527,22 @@ try {
                     alert('Invalid price for selected plan.');
                     return;
                 }
+
+                const startDate = new Date(formData.dateAdded);
+                let endDate = new Date(startDate);
+                if (formData.plan === 'Per Session') {
+                    endDate.setDate(endDate.getDate() + 1); // 24 hours
+                } else if (formData.plan === 'Monthly') {
+                    endDate.setDate(endDate.getDate() + 30); // 30 days
+                }
+                endDateText = endDate.toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
             } else {
                 alert('Please select a valid plan.');
                 return;
@@ -597,7 +557,8 @@ try {
                 <p><strong>Email:</strong> ${formData.email}</p>
                 <p><strong>Address:</strong> ${formData.address}</p>
                 <p><strong>Birth Date:</strong> ${formData.birthDate}</p>
-                <p><strong>Date Added:</strong> ${formData.dateAdded}</p>
+                <p><strong>Start Date:</strong> ${formData.dateAdded}</p>
+                <p><strong>End Date:</strong> ${endDateText}</p>
                 <p><strong>Plan:</strong> ${formData.plan}</p>
                 <hr>
                 <h6>Payment Procedure:</h6>
@@ -629,6 +590,21 @@ try {
                 alert('Please confirm payment has been received.');
             }
         });
+
+        function updateEndDatePreview() {
+            const plan = document.getElementById('plan').value;
+            const startDateInput = document.getElementById('dateAdded').value;
+            if (plan && startDateInput) {
+                const startDate = new Date(startDateInput);
+                let endDate = new Date(startDate);
+                if (plan === 'Per Session') {
+                    endDate.setDate(endDate.getDate() + 1);
+                } else if (plan === 'Monthly') {
+                    endDate.setDate(endDate.getDate() + 30);
+                }
+                console.log(`Plan: ${plan}, End Date: ${endDate.toLocaleString()}`); // For debugging
+            }
+        }
     </script>
 </body>
-</html> 
+</html>

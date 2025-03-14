@@ -444,10 +444,6 @@ try {
                             <i class="fas fa-id-card nav-icon"></i>
                             <span>Membership</span>
                         </a>
-                        <a href="logout.php" class="nav-item">
-                            <i class="fas fa-sign-out-alt nav-icon">
-                            </i><span>Logout</span>
-                        </a>
                         <?php endif; ?>
                         <!-- Admin-only navigation -->
                         <?php if ($user_role === 'admin'): ?>
@@ -478,10 +474,6 @@ try {
                         <a href="pricing.php" class="nav-item nav-item--active">
                             <i class="fas fa-dollar-sign nav-icon"></i>
                             <span>Pricing</span>
-                        </a>
-                        <a href="logout.php" class="nav-item">
-                            <i class="fas fa-sign-out-alt nav-icon">
-                            </i><span>Logout</span>
                         </a>
                         <?php endif; ?>
                     </div>

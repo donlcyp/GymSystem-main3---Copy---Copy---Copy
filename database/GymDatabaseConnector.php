@@ -331,29 +331,36 @@ class GymDatabaseConnector {
     }
 
     // Add a member using stored procedure
-    public function addMember($memberData) {
-        $lastInsertedId = null;
+    public function addMember($data) {
         try {
-            $stmt = $this->conn->prepare("CALL AddMember(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $amount = $this->getPrice($memberData['plan']); // Store the result in a variable
-            $stmt->bindParam(1, $memberData['first_name']);
-            $stmt->bindParam(2, $memberData['last_name']);
-            $stmt->bindParam(3, $memberData['email']);
-            $stmt->bindParam(4, $memberData['phone']);
-            $stmt->bindParam(5, $memberData['address']);
-            $stmt->bindParam(6, $memberData['birth_date']);
-            $stmt->bindParam(7, $memberData['plan']);
-            $stmt->bindParam(8, $memberData['start_date']);
-            $stmt->bindParam(9, $amount); // Use the variable here
-            $stmt->bindParam(10, $memberData['status']);
-            $stmt->bindParam(11, $memberData['created_by']);
-            $stmt->bindParam(12, $memberData['additional_param']);
-            $stmt->execute();
-            $lastInsertedId = $this->conn->lastInsertId();
-            return $lastInsertedId;
+            $pdo = $this->getConnection();
+            $stmt = $pdo->prepare("CALL AddMember(:first_name, :last_name, :email, :phone, :address, :birth_date, :plan, :start_date, :end_date, :amount, :status, :created_by)");
+            $stmt->execute([
+                ':first_name' => $data['first_name'],
+                ':last_name' => $data['last_name'],
+                ':email' => $data['email'],
+                ':phone' => $data['phone'],
+                ':address' => $data['address'],
+                ':birth_date' => $data['birth_date'],
+                ':plan' => $data['plan'],
+                ':start_date' => $data['start_date'],
+                ':end_date' => $data['end_date'],
+                ':amount' => $data['amount'],
+                ':status' => $data['status'],
+                ':created_by' => $data['created_by']
+            ]);
+    
+            // Fetch the result from the stored procedure
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (isset($result['success_message'])) {
+                return $result['success_message']; // "Member added successfully"
+            } elseif (isset($result['error_message'])) {
+                return $result['error_message']; // "0"
+            }
+            return "Unexpected result from stored procedure";
         } catch (PDOException $e) {
-            error_log("Error adding member: " . $e->getMessage());
-            return "Error adding member";
+            error_log("Error calling AddMember procedure: " . $e->getMessage());
+            return "0";
         }
     }
 
@@ -542,23 +549,17 @@ class GymDatabaseConnector {
         }
     }
 
-    public function renewPlan($membership_id, $plan, $amount, $start_date) {
-        try {
-            $pdo = self::getInstance();
-            $sql = "UPDATE `membership` SET `plan` = :plan, `amount` = :amount, `start_date` = :start_date WHERE `membership_id` = :membership_id";
-            $stmt = $this->conn->prepare($sql);
-
-            $stmt->execute([
-                ':plan' => $plan,
-                ':amount' => $amount,
-                ':start_date' => $start_date,
-                ':membership_id' => $membership_id
-            ]);
-            return "success"; // Return success indicator
-        } catch (PDOException $e) {
-            error_log("Error renewing plan: " . $e->getMessage());
-            return "Database error: " . $e->getMessage();
-        }
+    public function renewPlan($memberId, $planType, $amount, $startDate, $endDate) {
+        $pdo = $this->getConnection();
+        $stmt = $pdo->prepare("UPDATE membership SET plan = :plan, amount = :amount, start_date = :start_date, end_date = :end_date, status = 'active' WHERE membership_id = :id");
+        $stmt->execute([
+            ':plan' => $planType,
+            ':amount' => $amount,
+            ':start_date' => $startDate,
+            ':end_date' => $endDate,
+            ':id' => $memberId
+        ]);
+        return "Renewal success";
     }
     
         public function getPaymentLogByMemberId($memberId) {

@@ -713,57 +713,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 const yearlyLabels = <?php echo json_encode(array_column($stats['yearly_sales'], 'year')); ?>;
                 const yearlyData = <?php echo json_encode(array_column($stats['yearly_sales'], 'total')); ?>;
 
-                // Combine all labels for a unified x-axis
-                const allLabels = [...new Set([...dailyLabels, ...weeklyLabels, ...monthlyLabels, ...yearlyLabels])].sort();
-
                 new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: allLabels,
-                        datasets: [
-                            {
-                                label: 'Daily Sales',
-                                data: dailyData,
-                                borderColor: 'rgba(226, 29, 29, 1)',
-                                backgroundColor: 'rgba(226, 29, 29, 0.2)',
-                                fill: false,
-                                tension: 0.1
-                            },
-                            {
-                                label: 'Weekly Sales',
-                                data: weeklyData,
-                                borderColor: '#4CAF50',
-                                backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                                fill: false,
-                                tension: 0.1
-                            },
-                            {
-                                label: 'Monthly Sales',
-                                data: monthlyData,
-                                borderColor: '#FF9800', // Orange for monthly
-                                backgroundColor: 'rgba(255, 152, 0, 0.2)',
-                                fill: false,
-                                tension: 0.1
-                            },
-                            {
-                                label: 'Yearly Sales',
-                                data: yearlyData,
-                                borderColor: '#2196F3',
-                                backgroundColor: 'rgba(33, 150, 243, 0.2)',
-                                fill: false,
-                                tension: 0.1
-                            }
-                        ]
+                        datasets: [{
+                            label: 'Daily Sales',
+                            data: dailyData,
+                            borderColor: 'rgba(226, 29, 29, 1)',
+                            tension: 0.1
+                        }, {
+                            label: 'Weekly Sales',
+                            data: weeklyData,
+                            borderColor: '#4CAF50',
+                            tension: 0.1
+                        },{
+                            label: 'Monthly Sales',
+                            data: monthlyData,
+                            borderColor: '#FF9800', // Orange for monthly
+                            backgroundColor: 'rgba(255, 152, 0, 0.2)',
+                            fill: false,
+                            tension: 0.1
+                        }, {
+                            label: 'Yearly Sales',
+                            data: yearlyData,
+                            borderColor: '#2196F3',
+                            tension: 0.1
+                        }]
                     },
                     options: {
                         scales: {
                             x: {
                                 type: 'category',
+                                labels: dailyLabels.concat(weeklyLabels, yearlyLabels),
                                 title: { display: true, text: 'Time Period', color: '#fff' },
                                 ticks: { color: '#fff' }
                             },
                             y: {
-                                title: { display: true, text: 'Sales Revenue ($)', color: '#fff' },
+                                title: { display: true, text: 'Amount ($)', color: '#fff' },
                                 ticks: { color: '#fff' }
                             }
                         },
