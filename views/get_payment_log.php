@@ -1,26 +1,21 @@
 <?php
-session_start();
 require_once '../database/GymDatabaseConnector.php';
 
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['username'])) {
-    echo json_encode(['error' => 'Unauthorized']);
-    exit();
-}
-
 try {
     $db = GymDatabaseConnector::getInstance();
-    $membershipId = filter_input(INPUT_GET, 'membership_id', FILTER_SANITIZE_NUMBER_INT);
+    $memberId = filter_input(INPUT_GET, 'member_id', FILTER_VALIDATE_INT);
 
-    if (!$membershipId) {
-        echo json_encode(['error' => 'Membership ID is required']);
-        exit();
+    if ($memberId === false || $memberId <= 0) {
+        echo json_encode(['error' => 'Invalid member ID']);
+        exit;
     }
 
-    $paymentLogs = $db->getPaymentLogs($membershipId);
-    echo json_encode($paymentLogs);
+    $payments = $db->getPaymentLogByMemberId($memberId);
+    echo json_encode($payments); // Return empty array or data
 } catch (Exception $e) {
-    echo json_encode(['error' => 'Error fetching payment logs: ' . $e->getMessage()]);
+    error_log("Error in get_payment_log.php: " . $e->getMessage());
+    echo json_encode(['error' => 'Error fetching payment log: ' . $e->getMessage()]);
 }
-exit();
+?>

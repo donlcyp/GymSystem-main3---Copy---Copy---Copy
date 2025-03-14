@@ -16,10 +16,13 @@ class GymDatabaseConnector {
     ];
 
     private function __construct() {
+        error_log("Attempting to connect to the database...");
         try {
-            $dsn = "mysql:host={$this->host};dbname={$this->dbname};charset=utf8mb4";
+            $dsn = "mysql:host={$this->host};dbname={$this->dbname};charset=utf8mb4"; 
+            error_log("Database connection string: " . $dsn);
             $this->conn = new PDO($dsn, $this->username, $this->password, $this->options);
         } catch (PDOException $e) {
+            error_log("Database connection failed: " . $e->getMessage());
             throw new Exception("Database connection failed: " . $e->getMessage());
         }
     }
@@ -58,10 +61,8 @@ class GymDatabaseConnector {
             }
             return $result['userid'];
         } catch (PDOException $e) {
-
             throw new Exception("Database error during registration: " . $e->getMessage());
         } catch (Exception $e) {
-
             throw $e;
         }
     }
@@ -88,7 +89,6 @@ class GymDatabaseConnector {
             ]);
             return $result ? $userid : false;
         } catch (PDOException $e) {
-
             throw new Exception("Database error during registration: " . $e->getMessage());
         }
     }
@@ -334,8 +334,9 @@ class GymDatabaseConnector {
 
     // Add a member using stored procedure
     public function addMember($memberData) {
+        $lastInsertedId = null; // Initialize variable to hold last inserted ID
         try {
-            $stmt = $this->conn->prepare("CALL AddMember(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $this->conn->prepare("CALL AddMember(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->bindParam(1, $memberData['first_name']);
             $stmt->bindParam(2, $memberData['last_name']);
             $stmt->bindParam(3, $memberData['email']);
@@ -347,8 +348,10 @@ class GymDatabaseConnector {
             $stmt->bindParam(9, $memberData['amount']);
             $stmt->bindParam(10, $memberData['status']);
             $stmt->bindParam(11, $memberData['created_by']);
+            $stmt->bindParam(12, $memberData['additional_param']); // Assuming an additional parameter
             $stmt->execute();
-            return "success";
+            $lastInsertedId = $this->conn->lastInsertId(); // Get the last inserted ID
+            return $lastInsertedId; // Return the last inserted ID
         } catch (PDOException $e) {
             return "Error adding member: " . $e->getMessage();
         }
@@ -398,7 +401,6 @@ class GymDatabaseConnector {
             $result = $this->conn->query("SELECT @result AS result")->fetch();
             return $result['result'];
         } catch (PDOException $e) {
-
             throw new Exception("Error updating member: " . $e->getMessage());
         }
     }
@@ -417,7 +419,7 @@ class GymDatabaseConnector {
     }
 
     // NEW: Fetch payment log for a member
-    public function getPaymentLog($memberId) {
+    public function getPaymentLog($membershipId) {
         try {
             $stmt = $this->conn->prepare("
                 SELECT 
@@ -425,10 +427,10 @@ class GymDatabaseConnector {
                     payment_date, 
                     created_by 
                 FROM payment_log 
-                WHERE membership_id = :member_id 
+                WHERE membership_id = :membership_id 
                 ORDER BY payment_date DESC
             ");
-            $stmt->bindParam(':member_id', $memberId, PDO::PARAM_INT);
+            $stmt->bindParam(':membership_id', $membershipId, PDO::PARAM_INT);
             $stmt->execute();
             return $stmt->fetchAll();
         } catch (PDOException $e) {
@@ -496,7 +498,7 @@ class GymDatabaseConnector {
     public function getPaymentLogs($membershipId) {
         try {
             $stmt = $this->conn->prepare("
-                SELECT id, amount, payment_date, created_by 
+                SELECT payment_log_id, amount, payment_date, created_by 
                 FROM payment_log 
                 WHERE membership_id = :membership_id
             ");
@@ -540,20 +542,6 @@ class GymDatabaseConnector {
         }
     }
 
-    // Optional: Fetch membership details to verify the update
-    public function getMembershipDetails($membership_id) {
-        try {
-            $sql = "SELECT `amount`, `created_at` FROM `membership` WHERE `membership_id` = :membership_id";
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([':membership_id' => $membership_id]);
-            return $stmt->fetch(PDO::FETCH_ASSOC); // Fetch as associative array
-
-        } catch (PDOException $e) {
-            error_log("Failed to fetch membership details: " . $e->getMessage());
-            return null;
-        }
-    }
-
     public function renewPlan($membership_id, $plan, $amount, $start_date) {
         try {
             $pdo = self::getInstance();
@@ -573,8 +561,18 @@ class GymDatabaseConnector {
         }
     }
     
+        public function getPaymentLogByMemberId($memberId) {
+            try {
+                $stmt = $this->conn->prepare("SELECT payment_log_id, membership_id, amount, payment_date, created_by FROM payment_log WHERE membership_id = ? ORDER BY payment_date DESC");
+                $stmt->execute([$memberId]);
+                return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (PDOException $e) {
+                error_log("Error in getPaymentLogByMemberId: " . $e->getMessage());
+                return [];
+            }
+        }
+    
 
 } // End of class GymDatabaseConnector
 
 } // End of class_exists check
-?>

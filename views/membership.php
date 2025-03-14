@@ -451,7 +451,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
     </div>
 
     <!-- Renew Plan Modal -->
-    <div class="modal fade" id="renewModal" tabindex="-1" aria-labelledby="renewModalLabel" aria-hidden="true">
+        <div class="modal fade" id="renewModal" tabindex="-1" aria-labelledby="renewModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
@@ -478,6 +478,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
                             <table class="payment-history-table">
                                 <thead>
                                     <tr>
+                                        <th>Membership ID</th>
                                         <th>Amount</th>
                                         <th>Date</th>
                                         <th>Created By</th>
@@ -495,26 +496,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
             </div>
         </div>
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js" integrity="sha384-oBqDVmMz9ATKxIep9tiCxS/Z9fNfEXiDAYTujMAeBAsjFuCZSmKbSSUnQlmh/jp3" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js" integrity="sha384-oBqDVmMz9ATKxIep9tiCxS/Z9fNfEXiDAYTujMAeBAsjFuCZSmKbSSUnQlmh/jp3" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js" integrity="sha384-fbbOQedDUMZZ5KreZpsbe1LCZPVmfTnH7ois6mU1QK+m14rQ1l2bGBq41eYeM/fS" crossorigin="anonymous"></script>
     <script>
-        const sidebar = document.getElementById('sidebar');
-        const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.getElementById('sidebar');
+    const menuToggle = document.getElementById('menuToggle');
 
-        menuToggle.addEventListener('click', function(e) {
-            e.stopPropagation();
-            sidebar.classList.toggle('active');
-        });
+    menuToggle.addEventListener('click', function(e) {
+        e.stopPropagation();
+        sidebar.classList.toggle('active');
+    });
 
-        document.addEventListener('click', function(e) {
-            if (sidebar.classList.contains('active') && !sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
-                sidebar.classList.remove('active');
-            }
-        });
+    document.addEventListener('click', function(e) {
+        if (sidebar.classList.contains('active') && !sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
+            sidebar.classList.remove('active');
+        }
+    });
 
-        // Search functionality
-        document.getElementById('searchButton').addEventListener('click', searchTable);
+    // Search functionality
+    document.getElementById('searchButton').addEventListener('click', searchTable);
     document.getElementById('searchInput').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') searchTable();
     });
@@ -556,13 +556,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
                     const paymentHistoryBody = document.getElementById('paymentHistoryBody');
                     paymentHistoryBody.innerHTML = '';
                     if (data.error) {
-                        paymentHistoryBody.innerHTML = `<tr><td colspan="3" class="error-message">${data.error}</td></tr>`;
+                        paymentHistoryBody.innerHTML = `<tr><td colspan="4" class="error-message">${data.error}</td></tr>`;
                     } else if (!Array.isArray(data) || data.length === 0) {
-                        paymentHistoryBody.innerHTML = '<tr><td colspan="3">No payment records found.</td></tr>';
+                        paymentHistoryBody.innerHTML = '<tr><td colspan="4">No payment records found.</td></tr>';
                     } else {
                         data.forEach(payment => {
                             const row = document.createElement('tr');
                             row.innerHTML = `
+                                <td>${payment.membership_id || 'N/A'}</td>
                                 <td>₱${Number(payment.amount).toFixed(2)}</td>
                                 <td>${payment.payment_date || 'N/A'}</td>
                                 <td>${payment.created_by || 'N/A'}</td>
@@ -573,7 +574,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
                 })
                 .catch(error => {
                     console.error('Fetch Error:', error);
-                    document.getElementById('paymentHistoryBody').innerHTML = `<tr><td colspan="3" class="error-message">Error loading payment log: ${error.message}</td></tr>`;
+                    document.getElementById('paymentHistoryBody').innerHTML = `<tr><td colspan="4" class="error-message">Error loading payment log: ${error.message}</td></tr>`;
                 });
         });
     });
