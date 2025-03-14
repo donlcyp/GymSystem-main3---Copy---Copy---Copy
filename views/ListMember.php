@@ -442,7 +442,7 @@ try {
                         <a href="attendance.php" class="nav-item"><i class="fas fa-calendar-check nav-icon"></i><span>Attendance</span></a>
                         <a href="membership.php" class="nav-item"><i class="fas fa-id-card nav-icon"></i><span>Membership</span></a>
                         <a href="logs.php" class="nav-item"><i class="fas fa-file-alt nav-icon"></i><span>Logs</span></a>
-                        <a href="register.php" class="nav-item"><i class="fa-solid fa-circle-user"></i><span>Employee Create Account</span></a>
+                        <a href="register.php" class="nav-item"><i class="fa-solid fa-circle-user"></i><span>Add Employee</span></a>
                         <a href="employees.php" class="nav-item"><i class="fa-solid fa-user-tie"></i><span>Employees</span></a>
                         <a href="pricing.php" class="nav-item"><i class="fas fa-dollar-sign nav-icon"></i><span>Pricing</span></a>
                         <a href="logout.php" class="nav-item"><i class="fas fa-sign-out-alt nav-icon"></i><span>Logout</span></a>

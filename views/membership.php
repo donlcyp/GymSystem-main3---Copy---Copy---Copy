@@ -25,39 +25,60 @@ try {
     $members = $db->getMembers();
 
     // Handle renewal with payment logging
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
-    $memberId = filter_input(INPUT_POST, 'renew_id', FILTER_VALIDATE_INT);
-    $plan = filter_input(INPUT_POST, 'plan', FILTER_SANITIZE_STRING);
-    $startDate = filter_input(INPUT_POST, 'start_date', FILTER_SANITIZE_STRING) ?: $defaultDateAdded;
-    $amount = $prices[$plan] ?? 0.00;
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
+        $memberId = filter_input(INPUT_POST, 'renew_id', FILTER_VALIDATE_INT);
+        $plan = filter_input(INPUT_POST, 'plan', FILTER_SANITIZE_STRING);
+        $startDate = filter_input(INPUT_POST, 'start_date', FILTER_SANITIZE_STRING) ?: $defaultDateAdded;
+        $amount = $prices[$plan] ?? 0.00;
 
-    // Validate membership ID
-    if ($memberId === false || $memberId <= 0) {
-        $error = "Invalid or missing Membership ID for renewal.";
-    } elseif (!in_array($plan, array_keys($prices))) {
-        $error = "Invalid plan selected for renewal.";
-    } else {
-        $result = $db->renewPlan($memberId, $plan === 'Per Session' ? 'per_session' : 'monthly', $amount, $startDate);
-        if (strpos($result, 'success') !== false) {
-            $userid = $_SESSION['username'];
-            $action = "Renewed plan for member ID $memberId to $plan";
-            $db->addLog($userid, $action);
-            $db->addPaymentLog($memberId, $amount, $userid); // Add payment log
-            $success = "Plan renewed successfully";
-            $members = $db->getMembers(); // Refresh member list
+        if ($memberId === false || $memberId <= 0) {
+            $error = "Invalid or missing Membership ID for renewal.";
+        } elseif (!in_array($plan, array_keys($prices))) {
+            $error = "Invalid plan selected for renewal.";
         } else {
-            $error = "Error renewing plan: $result";
+            $result = $db->renewPlan($memberId, $plan === 'Per Session' ? 'per_session' : 'monthly', $amount, $startDate);
+            if (strpos($result, 'success') !== false) {
+                $userid = $_SESSION['username'];
+                $action = "Renewed plan for member ID $memberId to $plan";
+                $db->addLog($userid, $action);
+                $db->addPaymentLog($memberId, $amount, $userid);
+                $success = "Plan renewed successfully";
+                $members = $db->getMembers(); // Refresh member list
+            } else {
+                $error = "Error renewing plan: $result";
+            }
         }
     }
-}
-    // Other POST handlers (add member, delete member) remain unchanged
+
+    // Handle member deletion
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
+        $deleteId = filter_input(INPUT_POST, 'delete_id', FILTER_VALIDATE_INT);
+        if ($deleteId === false || $deleteId <= 0) {
+            $error = "Invalid or missing Membership ID for deletion.";
+        } else {
+            try {
+                $result = $db->deleteMember($deleteId);
+                if ($result === "Member deleted successfully") {
+                    $userid = $_SESSION['username'];
+                    $action = "Deleted member ID $deleteId";
+                    $db->addLog($userid, $action);
+                    $success = "Member deleted successfully";
+                    $members = $db->getMembers(); // Refresh member list
+                } else {
+                    $error = "Error deleting member: $result";
+                }
+            } catch (Exception $e) {
+                $error = "Deletion failed: " . $e->getMessage();
+            }
+        }
+    }
+
 } catch (Exception $e) {
     $error = "Error: " . $e->getMessage();
     $prices = ['Per Session' => 80.00, 'Monthly' => 850.00];
     $members = [];
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -119,52 +140,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
 
         /* Sidebar */
         .sidebar-nav {
-            background-color: #2c2c2c;
+            background-color: rgba(44, 44, 44, 1);
             width: 250px;
+            padding: 20px 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
             position: fixed;
+            height: 100%;
             top: 0;
             left: -250px;
-            height: 100%;
             transition: left 0.3s ease;
-            z-index: 900;
         }
         .sidebar-nav.active {
             left: 0;
         }
         .sidebar-header {
-            padding: 20px;
-            text-align: center;
-        }
-        .gym-title {
-            color: #fff;
-            font-family: 'Anton', sans-serif;
-            font-size: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 10px 0;
         }
         .sidebar-logo {
             width: 30px;
-            vertical-align: middle;
+            margin-left: 10px;
+            display: inline-block;
+        }
+        .sidebar-content {
+            padding: 20px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .gym-title {
+            color: #fff;
+            font-size: 24px;
+            font-family: 'Anton', sans-serif;
+            font-weight: 400;
+            margin: 0;
+            text-align: center;
+            display: inline-block;
+        }
+        .nav-menu {
+            margin-top: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+            padding: 0 10px;
+            box-sizing: border-box;
         }
         .nav-item {
-            display: block;
-            background-color: #e21d1d;
-            padding: 12px 20px;
+            border-radius: 20px;
+            background-color: rgba(226, 29, 29, 1);
+            padding: 12px 15px;
             color: #fff;
             text-decoration: none;
-            border-radius: 20px;
-            margin: 10px 20px;
+            font-family: Inter, -apple-system, Roboto, Helvetica, sans-serif;
+            font-weight: 700;
             font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            box-sizing: border-box;
+            text-align: left;
+            cursor: pointer;
         }
         .nav-item--active {
-            background-color: #ff3232;
+            background-color: rgba(255, 50, 50, 1);
         }
         .nav-icon {
-            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
         }
 
         /* Main Content */
         .main-content {
             flex: 1;
             padding: 20px;
+            transition: margin-left 0.3s ease;
+        }
+        .main-content.shifted {
+            margin-left: 250px;
         }
         .form-container {
             max-width: 1200px;
@@ -174,12 +235,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
             border-radius: 8px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
         }
-        h1 {
+        h1, h2 {
             color: #fff;
             font-family: 'Anton', sans-serif;
             font-size: 32px;
             margin-bottom: 25px;
             text-align: center;
+        }
+        h2 {
+            font-size: 24px;
         }
 
         /* Search Section */
@@ -188,7 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
             justify-content: center;
             align-items: center;
             gap: 15px;
-            margin-bottom: 40px; /* Space between search and table */
+            margin-bottom: 40px;
         }
         .search-input {
             width: 100%;
@@ -218,10 +282,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
             background-color: #cc0000;
         }
 
-        /* Table */
+        /* Membership Table (Renewal) */
         .table-container {
-            overflow-x: auto; /* Horizontal scrolling for table */
+            overflow-x: auto;
             width: 100%;
+            margin-bottom: 40px;
         }
         .membership-table {
             width: 100%;
@@ -229,7 +294,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
             color: #e0e0e0;
             border-collapse: collapse;
             font-size: 14px;
-            table-layout: auto; /* Adjust column widths based on content */
+            table-layout: auto;
         }
         .membership-table th {
             background-color: #ff4444;
@@ -237,13 +302,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
             padding: 12px 10px;
             text-align: left;
             font-weight: 600;
-            white-space: nowrap; /* Prevent header text wrapping */
+            white-space: nowrap;
         }
         .membership-table td {
             padding: 12px 10px;
             border-bottom: 1px solid #444;
             vertical-align: middle;
-            white-space: nowrap; /* Prevent text wrapping */
+            white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
@@ -281,6 +346,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
             padding: 6px 10px;
             width: auto;
             font-size: 12px;
+        }
+
+        /* Membership List Report Table */
+        .report-container {
+            margin-top: 40px;
+        }
+        .report-filter-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .report-search-input {
+            width: 100%;
+            max-width: 400px;
+            padding: 10px 15px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #333;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+        .report-search-input:focus {
+            border-color: #ff4444;
+            outline: none;
+        }
+        .report-table {
+            width: 100%;
+            background-color: #333;
+            color: #e0e0e0;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .report-table th {
+            background-color: #e21d1d;
+            color: #fff;
+            padding: 10px;
+            text-align: left;
+        }
+        .report-table td {
+            padding: 10px;
+            border-bottom: 1px solid #444;
+        }
+        .print-btn {
+            background-color: #ff4444;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            display: block;
+            margin: 15px auto;
+        }
+        .print-btn:hover {
+            background-color: #cc0000;
         }
 
         /* Modal */
@@ -329,21 +452,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
             text-align: center;
         }
 
+        /* Print Styles */
+        @media print {
+            .sidebar-nav, .admin-header, .search-container, .membership-table, .action-btn, .print-btn, .modal, .report-filter-container {
+                display: none !important;
+            }
+            .report-container {
+                display: block !important;
+                margin: 0;
+                padding: 0;
+            }
+            .report-table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .report-table th, .report-table td {
+                border: 1px solid #000;
+                padding: 8px;
+                color: #000;
+                background-color: #fff;
+            }
+            .form-container {
+                background-color: #fff;
+                box-shadow: none;
+                padding: 0;
+            }
+            .main-content {
+                padding: 0;
+            }
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .form-container {
                 padding: 15px;
             }
-            .search-container {
+            .search-container, .report-filter-container {
                 flex-direction: column;
                 gap: 15px;
             }
-            .search-input, .search-button {
+            .search-input, .search-button, .report-search-input {
                 width: 100%;
                 max-width: none;
             }
-            .membership-table th, .membership-table td {
-                min-width: 100px; /* Ensure columns have a minimum width */
+            .membership-table th, .membership-table td, .report-table th, .report-table td {
+                font-size: 12px;
+                padding: 8px;
             }
         }
     </style>
@@ -364,20 +518,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
                 <div class="sidebar-content">
                     <div class="nav-menu">
                         <?php if ($user_role === 'staff'): ?>
-                        <a href="dashboard.php" class="nav-item"><i class="fas fa-home nav-icon"></i><span>Home</span></a>
-                        <a href="ListMember.php" class="nav-item nav-item--active"><i class="fas fa-user-plus nav-icon"></i><span>Add Member</span></a>
-                        <a href="membership.php" class="nav-item"><i class="fas fa-id-card nav-icon"></i><span>Membership</span></a>
-                        <a href="attendance.php" class="nav-item"><i class="fas fa-calendar-check nav-icon"></i><span>Attendance</span></a>
+                            <a href="dashboard.php" class="nav-item"><i class="fas fa-home nav-icon"></i><span>Home</span></a>
+                            <a href="ListMember.php" class="nav-item"><i class="fas fa-user-plus nav-icon"></i><span>Add Member</span></a>
+                            <a href="membership.php" class="nav-item nav-item--active"><i class="fas fa-id-card nav-icon"></i><span>Membership</span></a>
+                            <a href="attendance.php" class="nav-item"><i class="fas fa-calendar-check nav-icon"></i><span>Attendance</span></a>
                         <?php endif; ?>
                         <?php if ($user_role === 'admin'): ?>
-                        <a href="dashboard.php" class="nav-item"><i class="fas fa-home nav-icon"></i><span>Home</span></a>
-                        <a href="ListMember.php" class="nav-item nav-item--active"><i class="fas fa-user-plus nav-icon"></i><span>Add Member</span></a>
-                        <a href="attendance.php" class="nav-item"><i class="fas fa-calendar-check nav-icon"></i><span>Attendance</span></a>
-                        <a href="membership.php" class="nav-item"><i class="fas fa-id-card nav-icon"></i><span>Membership</span></a>
-                        <a href="logs.php" class="nav-item"><i class="fas fa-file-alt nav-icon"></i><span>Logs</span></a>
-                        <a href="register.php" class="nav-item"><i class="fa-solid fa-circle-user nav-icon"></i><span>Employee Create Account</span></a>
-                        <a href="employees.php" class="nav-item"><i class="fa-solid fa-user-tie nav-icon"></i><span>Employees</span></a>
-                        <a href="pricing.php" class="nav-item"><i class="fas fa-dollar-sign nav-icon"></i><span>Pricing</span></a>
+                            <a href="dashboard.php" class="nav-item"><i class="fas fa-home nav-icon"></i><span>Home</span></a>
+                            <a href="ListMember.php" class="nav-item"><i class="fas fa-user-plus nav-icon"></i><span>Add Member</span></a>
+                            <a href="attendance.php" class="nav-item"><i class="fas fa-calendar-check nav-icon"></i><span>Attendance</span></a>
+                            <a href="membership.php" class="nav-item nav-item--active"><i class="fas fa-id-card nav-icon"></i><span>Membership</span></a>
+                            <a href="logs.php" class="nav-item"><i class="fas fa-file-alt nav-icon"></i><span>Logs</span></a>
+                            <a href="register.php" class="nav-item"><i class="fa-solid fa-circle-user nav-icon"></i><span>Employee Create Account</span></a>
+                            <a href="employees.php" class="nav-item"><i class="fa-solid fa-user-tie nav-icon"></i><span>Employees</span></a>
+                            <a href="pricing.php" class="nav-item"><i class="fas fa-dollar-sign nav-icon"></i><span>Pricing</span></a>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -392,6 +546,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
                     <?php if ($success || (isset($_GET['success']) && $_GET['success'] == 1)): ?>
                         <div class="success-message"><?php echo htmlspecialchars($success ?: 'Operation completed successfully!'); ?></div>
                     <?php endif; ?>
+
                     <div class="search-container">
                         <input type="text" class="search-input" id="searchInput" placeholder="Search members...">
                         <button class="search-button" id="searchButton">Search</button>
@@ -445,13 +600,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Membership List Report Table -->
+                    <div class="report-container">
+                        <h2>Membership List Report</h2>
+                        <div class="report-filter-container">
+                            <input type="text" class="report-search-input" id="reportSearchInput" placeholder="Filter report...">
+                        </div>
+                        <div class="table-container">
+                            <table class="report-table">
+                                <thead>
+                                    <tr>
+                                        <th>Membership ID</th>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Phone</th>
+                                        <th>Registration Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reportTableBody">
+                                    <?php if (!empty($members) && is_array($members)): ?>
+                                        <?php foreach ($members as $row): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($row['membership_id']); ?></td>
+                                                <td><?php echo htmlspecialchars($row['first_name'] . ' ' . $row['last_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($row['email'] ?? ''); ?></td>
+                                                <td><?php echo htmlspecialchars($row['phone'] ?? ''); ?></td>
+                                                <td><?php echo htmlspecialchars($row['start_date'] ?? ''); ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr><td colspan="5" class="no-members">No Members Registered Yet</td></tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <button class="print-btn" onclick="printReport()">Print Reports</button>
+                    </div>
                 </div>
             </main>
         </div>
     </div>
 
     <!-- Renew Plan Modal -->
-        <div class="modal fade" id="renewModal" tabindex="-1" aria-labelledby="renewModalLabel" aria-hidden="true">
+    <div class="modal fade" id="renewModal" tabindex="-1" aria-labelledby="renewModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
@@ -478,7 +670,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
                             <table class="payment-history-table">
                                 <thead>
                                     <tr>
-                                        <th>Membership ID</th>
                                         <th>Amount</th>
                                         <th>Date</th>
                                         <th>Created By</th>
@@ -496,86 +687,117 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['renew_id'])) {
             </div>
         </div>
     </div>
-        <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js" integrity="sha384-oBqDVmMz9ATKxIep9tiCxS/Z9fNfEXiDAYTujMAeBAsjFuCZSmKbSSUnQlmh/jp3" crossorigin="anonymous"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js" integrity="sha384-oBqDVmMz9ATKxIep9tiCxS/Z9fNfEXiDAYTujMAeBAsjFuCZSmKbSSUnQlmh/jp3" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js" integrity="sha384-fbbOQedDUMZZ5KreZpsbe1LCZPVmfTnH7ois6mU1QK+m14rQ1l2bGBq41eYeM/fS" crossorigin="anonymous"></script>
     <script>
-    const sidebar = document.getElementById('sidebar');
-    const menuToggle = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('sidebar');
+        const menuToggle = document.getElementById('menuToggle');
+        const mainContent = document.getElementById('mainContent');
 
-    menuToggle.addEventListener('click', function(e) {
-        e.stopPropagation();
-        sidebar.classList.toggle('active');
-    });
+        menuToggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            sidebar.classList.toggle('active');
+            mainContent.classList.toggle('shifted');
+        });
 
-    document.addEventListener('click', function(e) {
-        if (sidebar.classList.contains('active') && !sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
-            sidebar.classList.remove('active');
-        }
-    });
-
-    // Search functionality
-    document.getElementById('searchButton').addEventListener('click', searchTable);
-    document.getElementById('searchInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') searchTable();
-    });
-
-    function searchTable() {
-        const filter = document.getElementById('searchInput').value.toLowerCase();
-        const tr = document.querySelectorAll('.membership-table tbody tr:not(.no-members)');
-        let visibleRows = false;
-
-        tr.forEach(row => {
-            const text = Array.from(row.cells).slice(0, -1).map(cell => cell.textContent.toLowerCase()).join(' ');
-            row.style.display = text.includes(filter) ? '' : 'none';
-            if (text.includes(filter)) {
-                visibleRows = true;
+        document.addEventListener('click', function(e) {
+            if (sidebar.classList.contains('active') && !sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
+                sidebar.classList.remove('active');
+                mainContent.classList.remove('shifted');
             }
         });
 
-        const noMembersCell = document.querySelector('.no-members');
-        if (noMembersCell) {
-            noMembersCell.parentElement.style.display = tr.length === 0 || !visibleRows ? '' : 'none';
-        }
-    }
-
-    // Renew Modal Payment History
-    document.querySelectorAll('.renew-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const memberId = this.getAttribute('data-member-id');
-            document.getElementById('renewMemberId').value = memberId;
-
-            fetch(`get_payment_log.php?member_id=${memberId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Payment Data:', data);
-                    const paymentHistoryBody = document.getElementById('paymentHistoryBody');
-                    paymentHistoryBody.innerHTML = '';
-                    if (data.error) {
-                        paymentHistoryBody.innerHTML = `<tr><td colspan="4" class="error-message">${data.error}</td></tr>`;
-                    } else if (!Array.isArray(data) || data.length === 0) {
-                        paymentHistoryBody.innerHTML = '<tr><td colspan="4">No payment records found.</td></tr>';
-                    } else {
-                        data.forEach(payment => {
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>${payment.membership_id || 'N/A'}</td>
-                                <td>₱${Number(payment.amount).toFixed(2)}</td>
-                                <td>${payment.payment_date || 'N/A'}</td>
-                                <td>${payment.created_by || 'N/A'}</td>
-                            `;
-                            paymentHistoryBody.appendChild(row);
-                        });
-                    }
-                })
-                .catch(error => {
-                    console.error('Fetch Error:', error);
-                    document.getElementById('paymentHistoryBody').innerHTML = `<tr><td colspan="4" class="error-message">Error loading payment log: ${error.message}</td></tr>`;
-                });
+        // Search functionality for renewal table
+        document.getElementById('searchButton').addEventListener('click', searchRenewalTable);
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') searchRenewalTable();
         });
-    });
-</script>
+
+        function searchRenewalTable() {
+            const filter = document.getElementById('searchInput').value.toLowerCase();
+            const tr = document.querySelectorAll('.membership-table tbody tr:not(.no-members)');
+            let visibleRows = false;
+
+            tr.forEach(row => {
+                const text = Array.from(row.cells).slice(0, -1).map(cell => cell.textContent.toLowerCase()).join(' ');
+                row.style.display = text.includes(filter) ? '' : 'none';
+                if (text.includes(filter)) {
+                    visibleRows = true;
+                }
+            });
+
+            const noMembersCell = document.querySelector('.membership-table .no-members');
+            if (noMembersCell) {
+                noMembersCell.parentElement.style.display = tr.length === 0 || !visibleRows ? '' : 'none';
+            }
+        }
+
+        // Filter functionality for report table
+        document.getElementById('reportSearchInput').addEventListener('input', filterReportTable);
+
+        function filterReportTable() {
+            const filter = document.getElementById('reportSearchInput').value.toLowerCase();
+            const tr = document.querySelectorAll('.report-table tbody tr:not(.no-members)');
+            let visibleRows = false;
+
+            tr.forEach(row => {
+                const text = Array.from(row.cells).map(cell => cell.textContent.toLowerCase()).join(' ');
+                row.style.display = text.includes(filter) ? '' : 'none';
+                if (text.includes(filter)) {
+                    visibleRows = true;
+                }
+            });
+
+            const noMembersCell = document.querySelector('.report-table .no-members');
+            if (noMembersCell) {
+                noMembersCell.parentElement.style.display = tr.length === 0 || !visibleRows ? '' : 'none';
+            }
+        }
+
+        // Renew Modal Payment History
+        document.querySelectorAll('.renew-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const memberId = this.getAttribute('data-member-id');
+                document.getElementById('renewMemberId').value = memberId;
+
+                fetch(`get_payment_log.php?member_id=${memberId}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! Status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        const paymentHistoryBody = document.getElementById('paymentHistoryBody');
+                        paymentHistoryBody.innerHTML = '';
+                        if (data.error) {
+                            paymentHistoryBody.innerHTML = `<tr><td colspan="3" class="error-message">${data.error}</td></tr>`;
+                        } else if (!Array.isArray(data) || data.length === 0) {
+                            paymentHistoryBody.innerHTML = '<tr><td colspan="3">No payment records found.</td></tr>';
+                        } else {
+                            data.forEach(payment => {
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                                    <td>₱${Number(payment.amount).toFixed(2)}</td>
+                                    <td>${payment.payment_date || 'N/A'}</td>
+                                    <td>${payment.created_by || 'N/A'}</td>
+                                `;
+                                paymentHistoryBody.appendChild(row);
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Fetch Error:', error);
+                        document.getElementById('paymentHistoryBody').innerHTML = `<tr><td colspan="3" class="error-message">Error loading payment log: ${error.message}</td></tr>`;
+                    });
+            });
+        });
+
+        // Print Reports Function
+        function printReport() {
+            window.print();
+        }
+    </script>
+</body>
+</html>

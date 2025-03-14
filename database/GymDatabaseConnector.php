@@ -152,10 +152,10 @@ class GymDatabaseConnector {
     // Delete a member
     public function deleteMember($id) {
         try {
-            $stmt = $this->conn->prepare("CALL DeleteMember(:membership_id, @result)");
+            $stmt = $this->conn->prepare("CALL DeleteMember(:membership_id, @p_result)");
             $stmt->bindParam(':membership_id', $id, PDO::PARAM_INT);
             $stmt->execute();
-            $result = $this->conn->query("SELECT @result AS result")->fetch();
+            $result = $this->conn->query("SELECT @p_result AS result")->fetch();
             return $result['result'];
         } catch (PDOException $e) {
             throw new Exception("Error deleting member: " . $e->getMessage());
@@ -163,37 +163,29 @@ class GymDatabaseConnector {
     }
 
     public function getDashboardStats() {
-        try {
-            $stats = [];
-            $stmt = $this->conn->prepare("CALL GetDashboardStats()");
-            $stmt->execute();
-    
-            $totals = $stmt->fetch(PDO::FETCH_ASSOC);
-            $stats['total_members'] = $totals['total_members'] ?? 0;
-            $stats['total_sales'] = $totals['total_sales'] ?? 0.00;
-    
-            $stmt->nextRowset();
-            $stats['daily_sales'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-            $stmt->nextRowset();
-            $stats['weekly_sales'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-            $stmt->nextRowset();
-            $stats['monthly_sales'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-            $stmt->nextRowset();
-            $stats['yearly_sales'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-            $stmt->nextRowset();
-            $stats['recent_logs'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-            return $stats;
-        } catch (PDOException $e) {
-            error_log("PDOException in getDashboardStats: " . $e->getMessage() . " at " . $e->getTraceAsString());
-            throw new Exception("Error fetching dashboard stats: " . $e->getMessage());
-        }
+    try {
+        $stats = [];
+        $stmt = $this->conn->prepare("CALL GetDashboardStats()");
+        $stmt->execute();
+        $totals = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stats['total_members'] = $totals['total_members'] ?? 0;
+        $stats['total_sales'] = $totals['total_sales'] ?? 0.00;
+        $stmt->nextRowset();
+        $stats['daily_sales'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->nextRowset();
+        $stats['weekly_sales'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->nextRowset();
+        $stats['monthly_sales'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->nextRowset();
+        $stats['yearly_sales'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->nextRowset();
+        $stats['recent_logs'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $stats;
+    } catch (PDOException $e) {
+        error_log("PDOException in getDashboardStats: " . $e->getMessage());
+        throw new Exception("Error fetching dashboard stats: " . $e->getMessage());
     }
-
+}
     // Authenticate user
     public function authenticateUser($username, $password) {
         try {
@@ -268,12 +260,18 @@ class GymDatabaseConnector {
 
     // Delete an employee
     public function deleteEmployee($userid) {
+        error_log("Attempting to delete employee with ID: " . $userid); // Log the attempt
         try {
-            $stmt = $this->conn->prepare("CALL DeleteEmployee(:userid)");
+            $stmt = $this->conn->prepare("CALL DeleteEmployee(:userid)"); 
+            error_log("Executing stored procedure for deletion."); // Log execution
+            error_log("Executing stored procedure for deletion."); // Log execution
             $stmt->execute([':userid' => $userid]);
+            error_log("Employee deleted successfully: " . $userid); // Log success
+            error_log("Employee deleted successfully: " . $userid); // Log success
             return "Employee deleted successfully" . ($stmt->rowCount() > 0 ? "" : " (no rows affected)");
         } catch (PDOException $e) {
-            throw new Exception("Error deleting employee: " . $e->getMessage());
+            error_log("Error deleting employee: " . $e->getMessage()); // Log the error
+            throw new Exception("Error deleting employee. Please try again.");
         }
     }
 
@@ -334,9 +332,10 @@ class GymDatabaseConnector {
 
     // Add a member using stored procedure
     public function addMember($memberData) {
-        $lastInsertedId = null; // Initialize variable to hold last inserted ID
+        $lastInsertedId = null;
         try {
             $stmt = $this->conn->prepare("CALL AddMember(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $amount = $this->getPrice($memberData['plan']); // Store the result in a variable
             $stmt->bindParam(1, $memberData['first_name']);
             $stmt->bindParam(2, $memberData['last_name']);
             $stmt->bindParam(3, $memberData['email']);
@@ -345,15 +344,16 @@ class GymDatabaseConnector {
             $stmt->bindParam(6, $memberData['birth_date']);
             $stmt->bindParam(7, $memberData['plan']);
             $stmt->bindParam(8, $memberData['start_date']);
-            $stmt->bindParam(9, $memberData['amount']);
+            $stmt->bindParam(9, $amount); // Use the variable here
             $stmt->bindParam(10, $memberData['status']);
             $stmt->bindParam(11, $memberData['created_by']);
-            $stmt->bindParam(12, $memberData['additional_param']); // Assuming an additional parameter
+            $stmt->bindParam(12, $memberData['additional_param']);
             $stmt->execute();
-            $lastInsertedId = $this->conn->lastInsertId(); // Get the last inserted ID
-            return $lastInsertedId; // Return the last inserted ID
+            $lastInsertedId = $this->conn->lastInsertId();
+            return $lastInsertedId;
         } catch (PDOException $e) {
-            return "Error adding member: " . $e->getMessage();
+            error_log("Error adding member: " . $e->getMessage());
+            return "Error adding member";
         }
     }
 
